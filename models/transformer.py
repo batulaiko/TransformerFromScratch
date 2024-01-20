@@ -60,7 +60,7 @@ class MultiHeadAttention(nn.Module):
         # Lookahead mask (used in Decoder)
         if self.use_lookahead_mask:
             subsequent_mask = torch.tril(torch.ones(seq_len_q, seq_len_k)).to(query.device)
-            scores.masked_fill_(subsequent_mask == 0, float('-inf'))
+            scores.masked_fill_(subsequent_mask == 0, 1e-10)
 
         # Padding mask
         if pad_mask is not None:
@@ -68,7 +68,8 @@ class MultiHeadAttention(nn.Module):
             # __pad_mask.shape: (batch_size, 1, seq_len_q, 1)
             # pad mask is broadcasted from q dimension 
             # enc/dec case: q is the dimension of decoder output, k and v are from encoder
-            scores.masked_fill_(__pad_mask == 0, float('-inf'))
+            # NOTE: using float('-inf') here can cause numerical instability!
+            scores.masked_fill_(__pad_mask == 0, 1e-10)
 
         # ATTTENTION MATRIX (batch_size, num_heads, seq_len_q, seq_len_k)
         attention = torch.softmax(scores, dim=-1)
