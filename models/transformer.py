@@ -111,11 +111,13 @@ class AttentionResidualConnection(nn.Module):
     def __init__(self, layer, features_dim, dropout_prob):
         super().__init__()
         self.layer = layer
-        self.norm = nn.LayerNorm(features_dim)
+        self.norm_q = nn.LayerNorm(features_dim)
+        self.norm_k = nn.LayerNorm(features_dim)
+        self.norm_v = nn.LayerNorm(features_dim)
         self.dropout = nn.Dropout(dropout_prob)
 
     def forward(self, q, k, v, mask):
-        return q + self.dropout(self.layer(self.norm(q), self.norm(k), self.norm(v), mask))
+        return q + self.dropout(self.layer(self.norm_q(q), self.norm_k(k), self.norm_v(v), mask))
 
 
 class FeedForwardResidualConnection(nn.Module):
@@ -518,7 +520,4 @@ class T5(nn.Module):
         x_cross = self.vocab_projection(x_cross)
         
         return x_cross
-
-
-
-
+        
