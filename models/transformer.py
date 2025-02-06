@@ -95,7 +95,7 @@ class FeedForward(nn.Module):
         
         self.ff_block = nn.Sequential(
             nn.Linear(features_dim, ff_dim, bias=use_bias),
-            nn.GELU(),
+            nn.ReLU(),
             nn.Linear(ff_dim, features_dim, bias=use_bias),
         )
         
@@ -103,7 +103,7 @@ class FeedForward(nn.Module):
         return self.ff_block(x)
 
 
-class AttentionResidualConnection(nn.Module):
+class AttentionResidualConnectionPreNorm(nn.Module):
     """
     Multihead Attention
     Residual Connection with Pre-Layernorm + Dropout
@@ -117,10 +117,25 @@ class AttentionResidualConnection(nn.Module):
         self.dropout = nn.Dropout(dropout_prob)
 
     def forward(self, q, k, v, mask):
-        return q + self.dropout(self.layer(self.norm_q(q), self.norm_k(k), self.norm_v(v), mask))
+        return self.dropout(q + self.layer(self.norm_q(q), self.norm_k(k), self.norm_v(v), mask))
 
 
-class FeedForwardResidualConnection(nn.Module):
+class AttentionResidualConnectionPostNorm(nn.Module):
+    """
+    Multihead Attention
+    Residual Connection with Post-Layernorm + Dropout
+    """
+    def __init__(self, layer, features_dim, dropout_prob):
+        super().__init__()
+        self.layer = layer
+        self.norm = nn.LayerNorm(features_dim)
+        self.dropout = nn.Dropout(dropout_prob)
+
+    def forward(self, q, k, v, mask):
+        return self.dropout(q + self.norm(self.layer(q, k, v, mask)))
+
+
+class FeedForwardResidualConnectionPreNorm(nn.Module):
     """
     Feedforward Connection
     Residual Connection with Pre-Layernorm + Dropout
@@ -132,7 +147,22 @@ class FeedForwardResidualConnection(nn.Module):
         self.dropout = nn.Dropout(dropout_prob)
 
     def forward(self, x):
-        return x + self.dropout(self.layer(self.norm(x)))
+        return self.dropout(x + self.layer(self.norm(x)))
+
+
+class FeedForwardResidualConnectionPostNorm(nn.Module):
+    """
+    Feedforward Connection
+    Residual Connection with Post-Layernorm + Dropout
+    """
+    def __init__(self, layer, features_dim, dropout_prob):
+        super().__init__()
+        self.layer = layer
+        self.norm = nn.LayerNorm(features_dim)
+        self.dropout = nn.Dropout(dropout_prob)
+
+    def forward(self, x):
+        return self.dropout(x + self.norm(self.layer(x)))
 
 
 class EncoderLayer(nn.Module):
@@ -148,13 +178,13 @@ class EncoderLayer(nn.Module):
     ):
         super().__init__()
 
-        self.mha = AttentionResidualConnection(
+        self.mha = AttentionResidualConnectionPreNorm(
             layer=MultiHeadAttention(features_dim, num_heads, attn_use_bias, use_lookahead_mask=False), 
             features_dim=features_dim, 
             dropout_prob=attn_dropout_prob,
         )
 
-        self.ff = FeedForwardResidualConnection(
+        self.ff = FeedForwardResidualConnectionPreNorm(
             layer=FeedForward(features_dim, ff_dim, ff_use_bias), 
             features_dim=features_dim, 
             dropout_prob=ff_dropout_prob,
@@ -179,7 +209,7 @@ class DecoderLayer(nn.Module):
     ):
         super().__init__()
         
-        self.masked_mha = AttentionResidualConnection(
+        self.masked_mha = AttentionResidualConnectionPreNorm(
             layer=MultiHeadAttention(features_dim, num_heads, attn_use_bias, use_lookahead_mask=True), 
             features_dim=features_dim, 
             dropout_prob=attn_dropout_prob,
@@ -191,7 +221,7 @@ class DecoderLayer(nn.Module):
             dropout_prob=attn_dropout_prob,
         )
 
-        self.ff = FeedForwardResidualConnection(
+        self.ff = FeedForwardResidualConnectionPreNorm(
             layer=FeedForward(features_dim, ff_dim, ff_use_bias), 
             features_dim=features_dim, 
             dropout_prob=ff_dropout_prob,
@@ -223,13 +253,13 @@ class MaskedOnlyDecoderLayer(nn.Module):
     ):
         super().__init__()
         
-        self.masked_mha = AttentionResidualConnection(
+        self.masked_mha = AttentionResidualConnectionPreNorm(
             layer=MultiHeadAttention(features_dim, num_heads, attn_use_bias, use_lookahead_mask=True), 
             features_dim=features_dim, 
             dropout_prob=attn_dropout_prob,
         )
 
-        self.ff = FeedForwardResidualConnection(
+        self.ff = FeedForwardResidualConnectionPreNorm(
             layer=FeedForward(features_dim, ff_dim, ff_use_bias), 
             features_dim=features_dim, 
             dropout_prob=ff_dropout_prob,
@@ -263,6 +293,7 @@ class GPT(nn.Module):
 
         # Learnable position embbedings
         #self.position_emb = nn.Embedding(max_seq_len, features_dim)
+        #self.position_emb = nn.Embedding(512, features_dim) #################!!!!!!!!!!!!!
 
         self.emb_dropout_prob = nn.Dropout(p=emb_dropout_prob)
         
@@ -309,7 +340,10 @@ class GPT(nn.Module):
     def forward(self, x_input, pad_mask=None):
         _batch_size, _seq_len = x_input.size()
         _token_emb = self.token_emb(x_input)
+        
         _position_emb = self.generate_positional_embbedings(_seq_len).to(x_input.device)
+        #_positions = torch.arange(start=0, end=_seq_len, step=1).to(x_input.device)
+        #_position_emb = self.position_emb(_positions)
         x_input = self.emb_dropout_prob(_token_emb + _position_emb)
         
         # Self attenting Masked MHA
