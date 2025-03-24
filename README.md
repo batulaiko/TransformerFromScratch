@@ -30,9 +30,11 @@ In Implementation part, [Sentiment Analysis Dataset](https://www.kaggle.com/data
 		- Decoder Layer
 
 ## Resources
-[Attention is all you need, Original Paper](https://arxiv.org/abs/1706.03762b)
-[Illustrated Transformer](https://jalammar.github.io/illustrated-transformer/)
-[Attention Mechanism step-by-step Video](https://www.youtube.com/watch?v=eMlx5fFNoYc&t=172s&ab_channel=3Blue1Brown)
+- [Attention is all you need, Original Paper](https://arxiv.org/abs/1706.03762b)
+
+- [Illustrated Transformer](https://jalammar.github.io/illustrated-transformer/)
+
+- [Attention Mechanism step-by-step Video](https://www.youtube.com/watch?v=eMlx5fFNoYc&t=172s&ab_channel=3Blue1Brown)
 
 ## Acknowledgement
 This repo is created w/ the help of [H. Fuat ALSAN's Github Repo](https://github.com/fualsan/TransformerFromScratch).
